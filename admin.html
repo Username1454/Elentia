@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Elentia Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --green:#18b50c; --green-pale:rgba(24,181,12,0.08); --green-border:rgba(24,181,12,0.2);
+  --dark:#0b110b; --bg:#f5f7f5; --white:#fff; --text:#131813; --muted:#5a6e58;
+  --border:rgba(0,0,0,0.08); --red:#ef4444; --yellow:#f59e0b; --blue:#3b82f6;
+  --sidebar:220px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Inter","DM Sans",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* LOGIN */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0b110b,#0f1a0f)}
+.login-box{background:#fff;border-radius:20px;padding:48px;width:100%;max-width:420px;box-shadow:0 24px 80px rgba(0,0,0,0.3)}
+.login-logo{text-align:center;margin-bottom:32px}
+.login-logo h1{font-size:28px;font-weight:800;letter-spacing:-0.5px;color:var(--dark)}
+.login-logo span{color:var(--green)}
+.login-logo p{font-size:13px;color:var(--muted);margin-top:4px}
+.form-group{margin-bottom:18px}
+label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text)}
+input{width:100%;padding:12px 16px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;outline:none;transition:border .2s;font-family:inherit}
+input:focus{border-color:var(--green)}
+.btn-login{width:100%;background:var(--green);color:#fff;border:none;padding:14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .2s;margin-top:8px}
+.btn-login:hover{opacity:.9}
+.login-err{color:var(--red);font-size:13px;margin-top:10px;text-align:center;display:none}
+
+/* LAYOUT */
+#appScreen{display:none;min-height:100vh}
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:var(--sidebar);background:var(--dark);display:flex;flex-direction:column;z-index:100}
+.sidebar-logo{padding:24px 20px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.sidebar-logo h2{font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.3px}
+.sidebar-logo span{color:var(--green)}
+.sidebar-logo p{font-size:11px;color:#4a5a4a;margin-top:2px}
+.sidebar-nav{flex:1;padding:16px 12px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;color:#6a7e6a;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;margin-bottom:2px;user-select:none}
+.nav-item:hover{background:rgba(255,255,255,0.05);color:#a0b4a0}
+.nav-item.active{background:var(--green-pale);color:var(--green);border:1px solid var(--green-border)}
+.nav-item svg{width:16px;height:16px;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--green);color:#fff;font-size:10px;padding:2px 7px;border-radius:100px;font-weight:700}
+.sidebar-bottom{padding:16px 12px;border-top:1px solid rgba(255,255,255,0.06)}
+.logout-btn{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:10px;color:#4a5a4a;font-size:13px;cursor:pointer;transition:color .2s;width:100%;background:none;border:none;font-family:inherit}
+.logout-btn:hover{color:var(--red)}
+
+.main{margin-left:var(--sidebar);padding:32px;min-height:100vh}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.page-header h1{font-size:24px;font-weight:800;letter-spacing:-0.3px}
+.page-header p{font-size:14px;color:var(--muted);margin-top:2px}
+
+/* TABS */
+.view{display:none}.view.active{display:block}
+
+/* STATS */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat-card{background:var(--white);border-radius:14px;padding:22px;border:1px solid var(--border)}
+.stat-card .label{font-size:12px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.6px}
+.stat-card .value{font-size:32px;font-weight:800;margin-top:6px;line-height:1}
+.stat-card .sub{font-size:12px;color:var(--muted);margin-top:4px}
+.stat-green .value{color:var(--green)}
+.stat-blue .value{color:var(--blue)}
+.stat-yellow .value{color:var(--yellow)}
+.stat-red .value{color:var(--red)}
+
+/* TABLE */
+.card{background:var(--white);border-radius:14px;border:1px solid var(--border);overflow:hidden}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)}
+.card-header h2{font-size:16px;font-weight:700}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.search-box{position:relative}
+.search-box input{padding:9px 14px 9px 36px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;width:220px}
+.search-box svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--muted)}
+table{width:100%;border-collapse:collapse}
+th{padding:12px 18px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:13px 18px;font-size:14px;border-bottom:1px solid rgba(0,0,0,0.04)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafcfa}
+.prod-img-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;border:1px solid var(--border)}
+.prod-img-placeholder{width:44px;height:44px;border-radius:8px;background:var(--green-pale);display:flex;align-items:center;justify-content:center;font-size:18px;border:1px solid var(--green-border)}
+
+/* BADGES */
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;letter-spacing:.4px}
+.badge-green{background:rgba(24,181,12,0.1);color:var(--green)}
+.badge-blue{background:rgba(59,130,246,0.1);color:var(--blue)}
+.badge-yellow{background:rgba(245,158,11,0.1);color:var(--yellow)}
+.badge-red{background:rgba(239,68,68,0.1);color:var(--red)}
+.badge-gray{background:rgba(0,0,0,0.06);color:var(--muted)}
+
+/* STATUS TOGGLE */
+.toggle{width:38px;height:22px;background:#e0e0e0;border-radius:100px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.toggle.on{background:var(--green)}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.toggle.on::after{transform:translateX(16px)}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .2s;font-family:inherit}
+.btn-primary{background:var(--green);color:#fff;box-shadow:0 2px 12px rgba(24,181,12,.25)}
+.btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--muted);border:1.5px solid var(--border)}
+.btn-ghost:hover{border-color:var(--green);color:var(--green)}
+.btn-danger{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.btn-danger:hover{background:var(--red);color:#fff}
+.btn-sm{padding:6px 13px;font-size:12px}
+.btn-icon{width:34px;height:34px;padding:0;justify-content:center}
+.btn-icon svg{width:15px;height:15px}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:20px;padding:32px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 32px 100px rgba(0,0,0,.25)}
+.modal h2{font-size:20px;font-weight:800;margin-bottom:22px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{margin-bottom:16px}
+select{width:100%;padding:12px 16px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;outline:none;transition:border .2s;font-family:inherit;background:#fff}
+select:focus{border-color:var(--green)}
+textarea{width:100%;padding:12px 16px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;outline:none;transition:border .2s;font-family:inherit;resize:vertical;min-height:80px}
+textarea:focus{border-color:var(--green)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+.img-preview{width:100%;height:140px;border-radius:10px;object-fit:cover;margin-top:8px;border:1px solid var(--border);display:none}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state svg{width:48px;height:48px;stroke:currentColor;opacity:.4;margin-bottom:12px}
+.empty-state h3{font-size:16px;font-weight:600;margin-bottom:6px}
+.empty-state p{font-size:14px}
+
+/* ORDER STATUS */
+.status-select{border:1.5px solid var(--border);border-radius:7px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;outline:none;font-family:inherit}
+.loading{text-align:center;padding:40px;color:var(--muted);font-size:14px}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .sidebar{width:60px}
+  .sidebar-logo p,.nav-item span,.sidebar-logo h2,.logout-btn span{display:none}
+  .main{margin-left:60px;padding:20px}
+  .stat-grid{grid-template-columns:1fr 1fr}
+  .form-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <h1>Elentia <span>Admin</span></h1>
+      <p>Logga in för att hantera din e-shop</p>
+    </div>
+    <div class="form-group">
+      <label>E-postadress</label>
+      <input type="email" id="loginEmail" placeholder="admin@elentia.se">
+    </div>
+    <div class="form-group">
+      <label>Lösenord</label>
+      <input type="password" id="loginPassword" placeholder="••••••••">
+    </div>
+    <button class="btn-login" onclick="login()">Logga in</button>
+    <div class="login-err" id="loginErr">Fel e-post eller lösenord.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appScreen">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h2>Elentia <span>Admin</span></h2>
+      <p>E-shop hantering</p>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="showView('dashboard')">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item" onclick="showView('products')">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+        <span>Produkter</span>
+      </div>
+      <div class="nav-item" onclick="showView('categories')">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        <span>Kategorier</span>
+      </div>
+      <div class="nav-item" onclick="showView('orders')">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span>Ordrar</span>
+        <span class="nav-badge" id="newOrdersBadge" style="display:none">0</span>
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="logout-btn" onclick="logout()">
+        <svg fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span>Logga ut</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <div class="page-header">
+        <div><h1>Dashboard</h1><p>Välkommen tillbaka, Ferhat!</p></div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card stat-green"><div class="label">Produkter</div><div class="value" id="statProducts">–</div><div class="sub">Aktiva i butiken</div></div>
+        <div class="stat-card stat-blue"><div class="label">Kategorier</div><div class="value" id="statCats">–</div><div class="sub">Produktkategorier</div></div>
+        <div class="stat-card stat-yellow"><div class="label">Nya ordrar</div><div class="value" id="statNew">–</div><div class="sub">Obehandlade</div></div>
+        <div class="stat-card stat-red"><div class="label">Totalt ordrar</div><div class="value" id="statTotal">–</div><div class="sub">Alla förfrågningar</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Senaste Ordrar</h2><button class="btn btn-ghost btn-sm" onclick="showView('orders')">Visa alla →</button></div>
+        <table><thead><tr><th>Kund</th><th>Produkt</th><th>Status</th><th>Datum</th></tr></thead>
+        <tbody id="dashOrders"><tr><td colspan="4" class="loading">Laddar...</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div class="view" id="view-products">
+      <div class="page-header">
+        <div><h1>Produkter</h1><p>Hantera ditt produktsortiment</p></div>
+        <button class="btn btn-primary" onclick="openProductModal()">
+          <svg fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Ny Produkt
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <h2 id="prodCount">Produkter</h2>
+          <div class="toolbar">
+            <div class="search-box">
+              <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" placeholder="Sök produkt..." oninput="filterProducts(this.value)">
+            </div>
+            <select id="catFilter" onchange="filterProducts()" style="width:auto;padding:9px 14px">
+              <option value="">Alla kategorier</option>
+            </select>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>Bild</th><th>Produkt</th><th>Kategori</th><th>Pris</th><th>Status</th><th>Åtgärder</th></tr></thead>
+          <tbody id="productsTable"><tr><td colspan="6" class="loading">Laddar...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CATEGORIES -->
+    <div class="view" id="view-categories">
+      <div class="page-header">
+        <div><h1>Kategorier</h1><p>Organisera dina produkter</p></div>
+        <button class="btn btn-primary" onclick="openCatModal()">
+          <svg fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Ny Kategori
+        </button>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Namn</th><th>Slug</th><th>Produkter</th><th>Åtgärder</th></tr></thead>
+          <tbody id="catsTable"><tr><td colspan="4" class="loading">Laddar...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="view" id="view-orders">
+      <div class="page-header">
+        <div><h1>Ordrar</h1><p>Alla kundförfrågningar och beställningar</p></div>
+        <select id="orderFilter" onchange="loadOrders()" style="padding:10px 16px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-weight:600;font-family:inherit">
+          <option value="">Alla ordrar</option>
+          <option value="ny">Nya</option>
+          <option value="hanterad">Hanterade</option>
+          <option value="stängd">Stängda</option>
+        </select>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Kund</th><th>E-post</th><th>Telefon</th><th>Produkt</th><th>Meddelande</th><th>Status</th><th>Datum</th></tr></thead>
+          <tbody id="ordersTable"><tr><td colspan="7" class="loading">Laddar...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- PRODUCT MODAL -->
+<div class="modal-overlay" id="productModal">
+  <div class="modal">
+    <h2 id="productModalTitle">Ny Produkt</h2>
+    <input type="hidden" id="prodId">
+    <div class="form-group">
+      <label>Produktnamn *</label>
+      <input type="text" id="prodName" placeholder="ex. LED Panelbelysning Pro">
+    </div>
+    <div class="form-group">
+      <label>Beskrivning</label>
+      <textarea id="prodDesc" placeholder="Beskriv produkten..."></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Pris *</label>
+        <input type="text" id="prodPrice" placeholder="ex. 895 eller Offert">
+      </div>
+      <div class="form-group">
+        <label>Prisenhet</label>
+        <input type="text" id="prodSuffix" placeholder="/ st" value="/ st">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Kategori</label>
+        <select id="prodCat"></select>
+      </div>
+      <div class="form-group">
+        <label>Badge-typ</label>
+        <select id="prodBadgeType">
+          <option value="default">Standard (grön)</option>
+          <option value="new">Nyhet (blå)</option>
+          <option value="sale">Erbjudande (gul)</option>
+          <option value="popular">Populär (lila)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Badge-text</label>
+      <input type="text" id="prodBadge" placeholder="ex. Belysning, Nyhet, Populär">
+    </div>
+    <div class="form-group">
+      <label>Bild-URL</label>
+      <input type="text" id="prodImg" placeholder="https://..." oninput="previewImg(this.value)">
+      <img id="imgPreview" class="img-preview" alt="Förhandsgranskning">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('productModal')">Avbryt</button>
+      <button class="btn btn-primary" onclick="saveProduct()">Spara Produkt</button>
+    </div>
+  </div>
+</div>
+
+<!-- CATEGORY MODAL -->
+<div class="modal-overlay" id="catModal">
+  <div class="modal">
+    <h2 id="catModalTitle">Ny Kategori</h2>
+    <input type="hidden" id="catId">
+    <div class="form-group">
+      <label>Kategorinamn *</label>
+      <input type="text" id="catName" placeholder="ex. Belysning" oninput="autoSlug(this.value)">
+    </div>
+    <div class="form-group">
+      <label>Slug (URL-namn)</label>
+      <input type="text" id="catSlug" placeholder="ex. belysning">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('catModal')">Avbryt</button>
+      <button class="btn btn-primary" onclick="saveCategory()">Spara Kategori</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mzeyxojwisqbjotvxhyg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Si_oltU44W3ZbkQvrTzH6Q_BnsxP8PA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let allProducts = [], allCategories = [];
+
+// AUTH
+async function login() {
+  const email = document.getElementById('loginEmail').value;
+  const pass = document.getElementById('loginPassword').value;
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) {
+    document.getElementById('loginErr').style.display = 'block';
+  } else {
+    showApp();
+  }
+}
+document.getElementById('loginPassword').addEventListener('keydown', e => { if(e.key==='Enter') login(); });
+
+async function logout() {
+  await sb.auth.signOut();
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+async function checkSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) showApp();
+}
+
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+  loadAll();
+}
+
+// NAV
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name==='products') loadProducts();
+  if (name==='categories') loadCategories();
+  if (name==='orders') loadOrders();
+  if (name==='dashboard') loadDashboard();
+}
+
+// LOAD ALL
+async function loadAll() {
+  const [cats, prods] = await Promise.all([
+    sb.from('categories').select('*').order('name'),
+    sb.from('products').select('*, categories(name,slug)').order('created_at', {ascending:false})
+  ]);
+  allCategories = cats.data || [];
+  allProducts = prods.data || [];
+  loadDashboard();
+  populateCatSelects();
+}
+
+// DASHBOARD
+async function loadDashboard() {
+  const [prods, cats, newOrds, allOrds, recentOrds] = await Promise.all([
+    sb.from('products').select('id', {count:'exact'}).eq('active', true),
+    sb.from('categories').select('id', {count:'exact'}),
+    sb.from('orders').select('id', {count:'exact'}).eq('status', 'ny'),
+    sb.from('orders').select('id', {count:'exact'}),
+    sb.from('orders').select('*').order('created_at', {ascending:false}).limit(5)
+  ]);
+  document.getElementById('statProducts').textContent = prods.count ?? 0;
+  document.getElementById('statCats').textContent = cats.count ?? 0;
+  document.getElementById('statNew').textContent = newOrds.count ?? 0;
+  document.getElementById('statTotal').textContent = allOrds.count ?? 0;
+  const badge = document.getElementById('newOrdersBadge');
+  if ((newOrds.count ?? 0) > 0) { badge.style.display=''; badge.textContent = newOrds.count; } else badge.style.display='none';
+
+  const tb = document.getElementById('dashOrders');
+  const orders = recentOrds.data || [];
+  if (!orders.length) { tb.innerHTML = '<tr><td colspan="4" class="loading">Inga ordrar ännu</td></tr>'; return; }
+  tb.innerHTML = orders.map(o => `
+    <tr>
+      <td><strong>${e(o.customer_name)}</strong></td>
+      <td>${e(o.product_name||'–')}</td>
+      <td>${statusBadge(o.status)}</td>
+      <td style="color:var(--muted);font-size:13px">${fmtDate(o.created_at)}</td>
+    </tr>`).join('');
+}
+
+// PRODUCTS
+async function loadProducts() {
+  const { data } = await sb.from('products').select('*, categories(name,slug)').order('created_at',{ascending:false});
+  allProducts = data || [];
+  renderProducts(allProducts);
+  document.getElementById('prodCount').textContent = `Produkter (${allProducts.length})`;
+}
+
+function renderProducts(products) {
+  const tb = document.getElementById('productsTable');
+  if (!products.length) { tb.innerHTML='<tr><td colspan="6" class="loading">Inga produkter hittades</td></tr>'; return; }
+  tb.innerHTML = products.map(p => `
+    <tr>
+      <td>${p.image_url ? `<img src="${e(p.image_url)}" class="prod-img-thumb" onerror="this.style.display='none'">` : '<div class="prod-img-placeholder">📦</div>'}</td>
+      <td><strong>${e(p.name)}</strong>${p.badge ? `<br><span class="badge badge-${badgeClass(p.badge_type)}" style="margin-top:4px">${e(p.badge)}</span>` : ''}</td>
+      <td>${p.categories ? `<span class="badge badge-gray">${e(p.categories.name)}</span>` : '–'}</td>
+      <td><strong>${e(p.price)}</strong> <span style="color:var(--muted);font-size:12px">${e(p.price_suffix||'')}</span></td>
+      <td><div class="toggle ${p.active?'on':''}" onclick="toggleActive('${p.id}',${p.active})"></div></td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="editProduct('${p.id}')" title="Redigera"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="deleteProduct('${p.id}')" title="Ta bort"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function filterProducts(search) {
+  search = (typeof search === 'string' ? search : document.querySelector('.search-box input').value).toLowerCase();
+  const catVal = document.getElementById('catFilter').value;
+  const filtered = allProducts.filter(p => {
+    const matchSearch = p.name.toLowerCase().includes(search) || (p.description||'').toLowerCase().includes(search);
+    const matchCat = !catVal || p.category_id === catVal;
+    return matchSearch && matchCat;
+  });
+  renderProducts(filtered);
+}
+
+function openProductModal(product) {
+  document.getElementById('productModalTitle').textContent = product ? 'Redigera Produkt' : 'Ny Produkt';
+  document.getElementById('prodId').value = product?.id || '';
+  document.getElementById('prodName').value = product?.name || '';
+  document.getElementById('prodDesc').value = product?.description || '';
+  document.getElementById('prodPrice').value = product?.price || '';
+  document.getElementById('prodSuffix').value = product?.price_suffix || '/ st';
+  document.getElementById('prodBadge').value = product?.badge || '';
+  document.getElementById('prodBadgeType').value = product?.badge_type || 'default';
+  document.getElementById('prodImg').value = product?.image_url || '';
+  document.getElementById('prodCat').value = product?.category_id || '';
+  previewImg(product?.image_url || '');
+  document.getElementById('productModal').classList.add('open');
+}
+
+function editProduct(id) {
+  const p = allProducts.find(p => p.id === id);
+  if (p) openProductModal(p);
+}
+
+async function saveProduct() {
+  const id = document.getElementById('prodId').value;
+  const data = {
+    name: document.getElementById('prodName').value.trim(),
+    description: document.getElementById('prodDesc').value.trim(),
+    price: document.getElementById('prodPrice').value.trim(),
+    price_suffix: document.getElementById('prodSuffix').value.trim(),
+    category_id: document.getElementById('prodCat').value || null,
+    badge: document.getElementById('prodBadge').value.trim(),
+    badge_type: document.getElementById('prodBadgeType').value,
+    image_url: document.getElementById('prodImg').value.trim()
+  };
+  if (!data.name || !data.price) { alert('Namn och pris krävs'); return; }
+  if (id) { await sb.from('products').update(data).eq('id', id); }
+  else { await sb.from('products').insert(data); }
+  closeModal('productModal');
+  loadProducts();
+  loadDashboard();
+}
+
+async function deleteProduct(id) {
+  if (!confirm('Ta bort produkten?')) return;
+  await sb.from('products').delete().eq('id', id);
+  loadProducts();
+  loadDashboard();
+}
+
+async function toggleActive(id, current) {
+  await sb.from('products').update({ active: !current }).eq('id', id);
+  loadProducts();
+}
+
+function previewImg(url) {
+  const img = document.getElementById('imgPreview');
+  if (url) { img.src = url; img.style.display = 'block'; } else img.style.display = 'none';
+}
+
+// CATEGORIES
+async function loadCategories() {
+  const { data } = await sb.from('categories').select('*, products(id)').order('name');
+  allCategories = data || [];
+  const tb = document.getElementById('catsTable');
+  if (!allCategories.length) { tb.innerHTML = '<tr><td colspan="4" class="loading">Inga kategorier</td></tr>'; return; }
+  tb.innerHTML = allCategories.map(c => `
+    <tr>
+      <td><strong>${e(c.name)}</strong></td>
+      <td><code style="background:var(--bg);padding:3px 8px;border-radius:5px;font-size:12px">${e(c.slug)}</code></td>
+      <td><span class="badge badge-gray">${c.products?.length ?? 0} produkter</span></td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="editCategory('${c.id}')" title="Redigera"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="deleteCategory('${c.id}')" title="Ta bort"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function openCatModal(cat) {
+  document.getElementById('catModalTitle').textContent = cat ? 'Redigera Kategori' : 'Ny Kategori';
+  document.getElementById('catId').value = cat?.id || '';
+  document.getElementById('catName').value = cat?.name || '';
+  document.getElementById('catSlug').value = cat?.slug || '';
+  document.getElementById('catModal').classList.add('open');
+}
+
+function editCategory(id) {
+  const c = allCategories.find(c => c.id === id);
+  if (c) openCatModal(c);
+}
+
+function autoSlug(name) {
+  document.getElementById('catSlug').value = name.toLowerCase().replace(/å/g,'a').replace(/ä/g,'a').replace(/ö/g,'o').replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+}
+
+async function saveCategory() {
+  const id = document.getElementById('catId').value;
+  const data = { name: document.getElementById('catName').value.trim(), slug: document.getElementById('catSlug').value.trim() };
+  if (!data.name || !data.slug) { alert('Namn och slug krävs'); return; }
+  if (id) await sb.from('categories').update(data).eq('id', id);
+  else await sb.from('categories').insert(data);
+  closeModal('catModal');
+  loadCategories();
+  populateCatSelects();
+}
+
+async function deleteCategory(id) {
+  if (!confirm('Ta bort kategorin? Produkter i kategorin behålls.')) return;
+  await sb.from('categories').delete().eq('id', id);
+  loadCategories();
+}
+
+// ORDERS
+async function loadOrders() {
+  const status = document.getElementById('orderFilter').value;
+  let query = sb.from('orders').select('*').order('created_at',{ascending:false});
+  if (status) query = query.eq('status', status);
+  const { data } = await query;
+  const orders = data || [];
+  const tb = document.getElementById('ordersTable');
+  if (!orders.length) { tb.innerHTML = '<tr><td colspan="7" class="loading">Inga ordrar hittades</td></tr>'; return; }
+  tb.innerHTML = orders.map(o => `
+    <tr>
+      <td><strong>${e(o.customer_name)}</strong></td>
+      <td><a href="mailto:${e(o.customer_email)}" style="color:var(--green)">${e(o.customer_email)}</a></td>
+      <td>${o.customer_phone ? `<a href="tel:${e(o.customer_phone)}" style="color:var(--muted)">${e(o.customer_phone)}</a>` : '–'}</td>
+      <td>${e(o.product_name||'–')}</td>
+      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:13px">${e(o.message||'–')}</td>
+      <td>
+        <select class="status-select" onchange="updateOrderStatus('${o.id}', this.value)" style="color:${statusColor(o.status)}">
+          <option value="ny" ${o.status==='ny'?'selected':''}>🟡 Ny</option>
+          <option value="hanterad" ${o.status==='hanterad'?'selected':''}>🟢 Hanterad</option>
+          <option value="stängd" ${o.status==='stängd'?'selected':''}>⚫ Stängd</option>
+        </select>
+      </td>
+      <td style="color:var(--muted);font-size:13px;white-space:nowrap">${fmtDate(o.created_at)}</td>
+    </tr>`).join('');
+}
+
+async function updateOrderStatus(id, status) {
+  await sb.from('orders').update({ status }).eq('id', id);
+  loadDashboard();
+}
+
+// HELPERS
+function populateCatSelects() {
+  const selects = [document.getElementById('prodCat'), document.getElementById('catFilter')];
+  selects[0].innerHTML = '<option value="">Välj kategori</option>' + allCategories.map(c=>`<option value="${c.id}">${e(c.name)}</option>`).join('');
+  selects[1].innerHTML = '<option value="">Alla kategorier</option>' + allCategories.map(c=>`<option value="${c.id}">${e(c.name)}</option>`).join('');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', function(ev){ if(ev.target===this) this.classList.remove('open'); }));
+
+function e(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(d) { return new Date(d).toLocaleDateString('sv-SE', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}); }
+function badgeClass(t) { return {default:'green',new:'blue',sale:'yellow',popular:'purple'}[t]||'gray'; }
+function statusBadge(s) { const m={ny:'badge-yellow',hanterad:'badge-green',stängd:'badge-gray'}; return `<span class="badge ${m[s]||'badge-gray'}">${s}</span>`; }
+function statusColor(s) { return {ny:'var(--yellow)',hanterad:'var(--green)',stängd:'var(--muted)'}[s]||'inherit'; }
+
+checkSession();
+</script>
+</body>
+</html>
