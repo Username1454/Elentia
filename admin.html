@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Elentia Admin</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
 :root {
   --green:#18b50c; --green-pale:rgba(24,181,12,0.08); --green-border:rgba(24,181,12,0.2);
@@ -189,6 +190,10 @@ textarea:focus{border-color:var(--green)}
         <span>Ordrar</span>
         <span class="nav-badge" id="newOrdersBadge" style="display:none">0</span>
       </div>
+      <div class="nav-item" onclick="showView('stats')">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>Statistik</span>
+      </div>
     </nav>
     <div class="sidebar-bottom">
       <button class="logout-btn" onclick="logout()">
@@ -199,6 +204,50 @@ textarea:focus{border-color:var(--green)}
   </aside>
 
   <main class="main">
+
+    <!-- STATS -->
+    <div class="view" id="view-stats">
+      <div class="page-header">
+        <div><h1>Statistik</h1><p>Sidvisningar, sökningar och trender</p></div>
+        <select id="statsPeriod" onchange="loadStats()" style="padding:10px 16px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-weight:600;font-family:inherit">
+          <option value="7">Senaste 7 dagarna</option>
+          <option value="30">Senaste 30 dagarna</option>
+          <option value="90">Senaste 90 dagarna</option>
+        </select>
+      </div>
+
+      <div class="stat-grid" style="margin-bottom:24px">
+        <div class="stat-card stat-green"><div class="label">Sidvisningar</div><div class="value" id="statViews">–</div><div class="sub">Produktsidan</div></div>
+        <div class="stat-card stat-blue"><div class="label">Sökningar</div><div class="value" id="statSearches">–</div><div class="sub">Filterklick</div></div>
+        <div class="stat-card stat-yellow"><div class="label">Idag</div><div class="value" id="statToday">–</div><div class="sub">Besök idag</div></div>
+        <div class="stat-card stat-red"><div class="label">Populärast</div><div class="value" id="statTopSearch" style="font-size:18px;margin-top:10px">–</div><div class="sub">Mest sökt kategori</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+        <div class="card">
+          <div class="card-header"><h2>Sidvisningar per dag</h2></div>
+          <div style="padding:24px"><canvas id="viewsChart" height="200"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Sökningar per dag</h2></div>
+          <div style="padding:24px"><canvas id="searchChart" height="200"></canvas></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div class="card">
+          <div class="card-header"><h2>Populäraste sökningar</h2></div>
+          <table>
+            <thead><tr><th>Sökning</th><th>Antal</th><th>Andel</th></tr></thead>
+            <tbody id="topSearchesTable"><tr><td colspan="3" class="loading">Laddar...</td></tr></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Ordrar per dag</h2></div>
+          <div style="padding:24px"><canvas id="ordersChart" height="200"></canvas></div>
+        </div>
+      </div>
+    </div>
 
     <!-- DASHBOARD -->
     <div class="view active" id="view-dashboard">
@@ -645,6 +694,94 @@ function fmtDate(d) { return new Date(d).toLocaleDateString('sv-SE', {day:'numer
 function badgeClass(t) { return {default:'green',new:'blue',sale:'yellow',popular:'purple'}[t]||'gray'; }
 function statusBadge(s) { const m={ny:'badge-yellow',hanterad:'badge-green',stängd:'badge-gray'}; return `<span class="badge ${m[s]||'badge-gray'}">${s}</span>`; }
 function statusColor(s) { return {ny:'var(--yellow)',hanterad:'var(--green)',stängd:'var(--muted)'}[s]||'inherit'; }
+
+// STATS
+let charts = {};
+
+async function loadStats() {
+  const days = parseInt(document.getElementById('statsPeriod').value);
+  const since = new Date(Date.now() - days * 864e5).toISOString();
+
+  const [viewsRes, searchRes, ordersRes] = await Promise.all([
+    sb.from('page_views').select('created_at').gte('created_at', since),
+    sb.from('search_queries').select('query, created_at').gte('created_at', since),
+    sb.from('orders').select('created_at').gte('created_at', since)
+  ]);
+
+  const views = viewsRes.data || [];
+  const searches = searchRes.data || [];
+  const orders = ordersRes.data || [];
+
+  // Summary stats
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('statViews').textContent = views.length;
+  document.getElementById('statSearches').textContent = searches.length;
+  document.getElementById('statToday').textContent = views.filter(v => v.created_at.startsWith(today)).length;
+
+  // Top search
+  const searchCount = {};
+  searches.forEach(s => { searchCount[s.query] = (searchCount[s.query]||0)+1; });
+  const topSearch = Object.entries(searchCount).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('statTopSearch').textContent = topSearch ? topSearch[0] : '–';
+
+  // Build date labels
+  const labels = [];
+  for (let i = days-1; i >= 0; i--) {
+    const d = new Date(Date.now() - i*864e5);
+    labels.push(d.toISOString().slice(0,10));
+  }
+
+  const countByDay = (arr) => {
+    const m = {};
+    arr.forEach(r => { const d = r.created_at.slice(0,10); m[d]=(m[d]||0)+1; });
+    return labels.map(l => m[l]||0);
+  };
+
+  const chartOpts = (color) => ({
+    responsive:true, maintainAspectRatio:true,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{display:false},ticks:{maxTicksLimit:7,font:{size:11}}},
+      y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{font:{size:11}},beginAtZero:true}
+    },
+    elements:{line:{tension:0.4},point:{radius:3}}
+  });
+
+  const makeChart = (id, data, color, type='line') => {
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(document.getElementById(id), {
+      type,
+      data:{
+        labels: labels.map(l => l.slice(5)),
+        datasets:[{data, borderColor:color, backgroundColor: type==='bar' ? color+'33' : color+'18', fill:true, borderWidth:2}]
+      },
+      options: chartOpts(color)
+    });
+  };
+
+  makeChart('viewsChart', countByDay(views), '#18b50c');
+  makeChart('searchChart', countByDay(searches), '#3b82f6');
+  makeChart('ordersChart', countByDay(orders), '#f59e0b', 'bar');
+
+  // Top searches table
+  const tb = document.getElementById('topSearchesTable');
+  const sorted = Object.entries(searchCount).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const total = searches.length || 1;
+  if (!sorted.length) { tb.innerHTML='<tr><td colspan="3" class="loading">Inga sökningar ännu</td></tr>'; return; }
+  tb.innerHTML = sorted.map(([q,n]) => `
+    <tr>
+      <td><strong>${e(q)}</strong></td>
+      <td>${n}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="flex:1;height:6px;background:#f0f5f0;border-radius:100px;overflow:hidden">
+            <div style="width:${Math.round(n/total*100)}%;height:100%;background:var(--green);border-radius:100px"></div>
+          </div>
+          <span style="font-size:12px;color:var(--muted)">${Math.round(n/total*100)}%</span>
+        </div>
+      </td>
+    </tr>`).join('');
+}
 
 checkSession();
 </script>
