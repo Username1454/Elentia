@@ -595,6 +595,118 @@ footer { background:linear-gradient(160deg,#080e08 0%,#0b110b 100%); }
   .products { padding:60px 24px; }
   .prod-filters { gap:8px; }
 }
+
+/* ============ MOBILE ============ */
+@media(max-width:768px) {
+  /* NAV */
+  nav { padding:14px 20px; }
+  .nav-links { display:none; }
+  .nav-logo img { height:40px; }
+
+  /* Hamburger */
+  .nav-hamburger {
+    display:flex; flex-direction:column; gap:5px; cursor:pointer;
+    padding:6px; background:none; border:none;
+  }
+  .nav-hamburger span {
+    display:block; width:24px; height:2px;
+    background:var(--text); border-radius:2px; transition:all .3s;
+  }
+  .mobile-menu {
+    display:none; position:fixed; inset:0; background:rgba(255,255,255,0.98);
+    backdrop-filter:blur(20px); z-index:200; flex-direction:column;
+    align-items:center; justify-content:center; gap:32px;
+  }
+  .mobile-menu.open { display:flex; }
+  .mobile-menu a {
+    font-family:"Bebas Neue"; font-size:48px; color:var(--text);
+    text-decoration:none; letter-spacing:2px; transition:color .2s;
+  }
+  .mobile-menu a:hover { color:var(--green); }
+  .mobile-close {
+    position:absolute; top:20px; right:24px;
+    font-size:32px; background:none; border:none;
+    cursor:pointer; color:var(--muted);
+  }
+
+  /* HERO */
+  .hero { min-height:100svh; }
+  .hero-left {
+    margin-left:24px; margin-right:24px;
+    padding:120px 0 80px; max-width:100%;
+  }
+  .hero-h1 { font-size:clamp(52px,14vw,80px); }
+  .hero-p { font-size:15px; max-width:100%; }
+  .hero-btns { flex-direction:column; }
+  .btn-green, .btn-ghost-dark { width:100%; text-align:center; }
+  .hero-scroll-hint { left:24px; }
+  .hero-photo-overlay {
+    background: linear-gradient(to bottom,
+      rgba(255,255,255,0.3) 0%,
+      rgba(255,255,255,0.75) 50%,
+      rgba(255,255,255,0.95) 100%);
+  }
+
+  /* STATS */
+  .stats { padding:28px 20px; flex-wrap:wrap; gap:20px; }
+  .stat-sep { display:none; }
+  .stat { width:calc(50% - 10px); }
+  .stat-n { font-size:40px; }
+
+  /* SERVICES */
+  .services { padding:70px 20px; }
+  .svc-grid { grid-template-columns:1fr; gap:16px; }
+
+  /* PROJECTS */
+  .proj-head { padding:0 20px; }
+  .proj-track { padding:8px 20px 20px; }
+  .proj-drag-hint { padding:0 20px; }
+  .proj-card { width:280px; }
+
+  /* ABOUT */
+  .about { padding:70px 20px; }
+  .about-inner { grid-template-columns:1fr; gap:40px; }
+  .about-imgs { height:320px; }
+  .img-a { width:75%; height:72%; }
+  .img-b { width:55%; height:50%; }
+  .years-badge { left:50%; top:38%; }
+
+  /* GALLERY */
+  .gallery-head { padding:0 20px; }
+  .gal-item { width:220px; height:160px; }
+
+  /* STICKY / PROCESS */
+  .sticky-wrap { grid-template-columns:1fr; }
+  .sticky-side { display:none; }
+  .sticky-pane { padding:50px 20px; min-height:auto; }
+
+  .process { padding:70px 20px; }
+  .process-grid { grid-template-columns:1fr 1fr; gap:1px; }
+  .proc-card { padding:28px 20px; }
+  .proc-big { font-size:60px; }
+
+  /* TESTIMONIALS */
+  .testimonials { padding:70px 20px; }
+  .testi-grid { grid-template-columns:1fr; gap:16px; }
+
+  /* CTA */
+  .cta { padding:80px 20px; }
+  .btn-white, .btn-outline-w { display:block; margin:0 0 12px; width:100%; text-align:center; }
+
+  /* FOOTER */
+  footer { padding:50px 20px 28px; }
+  .footer-grid { grid-template-columns:1fr; gap:32px; }
+  .footer-bottom { flex-direction:column; gap:10px; text-align:center; }
+
+  /* SECTION HEADERS */
+  .section-h { font-size:clamp(38px,10vw,60px); }
+  .tag { font-size:10px; }
+}
+
+@media(max-width:480px) {
+  .process-grid { grid-template-columns:1fr; }
+  .hero-h1 { font-size:clamp(44px,16vw,70px); }
+}
 </style>
 </head>
 <body>
@@ -614,7 +726,20 @@ footer { background:linear-gradient(160deg,#080e08 0%,#0b110b 100%); }
     <li><a href="#process">Process</a></li>
     <li><a href="#kontakt" class="nav-btn">Begär Offert</a></li>
   </ul>
+  <button class="nav-hamburger" onclick="openMobileMenu()" style="display:none">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobileMenu">
+  <button class="mobile-close" onclick="closeMobileMenu()">✕</button>
+  <a href="#tjanster" onclick="closeMobileMenu()">Tjänster</a>
+  <a href="produkter.html" onclick="closeMobileMenu()">Produkter</a>
+  <a href="#om" onclick="closeMobileMenu()">Om Oss</a>
+  <a href="#process" onclick="closeMobileMenu()">Process</a>
+  <a href="#kontakt" onclick="closeMobileMenu()" style="color:var(--green)">Begär Offert</a>
+</div>
 
 <!-- HERO -->
 <section class="hero" id="top">
@@ -1110,6 +1235,20 @@ document.querySelectorAll("a,button,.svc-card,.tcard,.proc-card,.proj-card,.gal-
 // NAV
 const nav=document.getElementById("mainNav");
 window.addEventListener("scroll",()=>nav.classList.toggle("scrolled",scrollY>50));
+
+// HAMBURGER
+function openMobileMenu(){ document.getElementById("mobileMenu").classList.add("open"); document.body.style.overflow="hidden"; }
+function closeMobileMenu(){ document.getElementById("mobileMenu").classList.remove("open"); document.body.style.overflow=""; }
+
+// Show hamburger on mobile
+function checkMobile(){
+  const ham = document.querySelector(".nav-hamburger");
+  const links = document.querySelector(".nav-links");
+  if(window.innerWidth <= 768){ ham.style.display="flex"; links.style.display="none"; }
+  else { ham.style.display="none"; links.style.display="flex"; }
+}
+checkMobile();
+window.addEventListener("resize", checkMobile);
 
 // HERO PARALLAX
 const hp=document.getElementById("heroPhoto");
